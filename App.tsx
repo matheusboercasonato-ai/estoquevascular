@@ -96,12 +96,17 @@ const App: React.FC = () => {
   };
 
   const handleDeleteProduct = (id: string) => {
-    const confirmDelete = window.confirm('Tem certeza que deseja excluir este produto permanentemente? Esta ação não pode ser desfeita.');
-    if (confirmDelete) {
-      setState(prev => ({
-        ...prev,
-        products: prev.products.filter(p => p.id !== id)
-      }));
+    // Usamos um identificador explícito para evitar confusão de contexto
+    if (window.confirm('Deseja excluir permanentemente este produto e todo o seu histórico?')) {
+      setState(prevState => {
+        const newProducts = prevState.products.filter(p => p.id !== id);
+        const newTransactions = prevState.transactions.filter(t => t.productId !== id);
+        return {
+          ...prevState,
+          products: newProducts,
+          transactions: newTransactions
+        };
+      });
       setIsProductModalOpen(false);
       setEditingProduct(null);
     }
@@ -398,8 +403,8 @@ const App: React.FC = () => {
                             <td className="px-6 py-4 text-slate-600 font-mono text-xs md:text-sm whitespace-nowrap font-medium">R$ {product.costPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex justify-end gap-1">
-                                <button type="button" onClick={(e) => { e.stopPropagation(); handleEditClick(product); }} className="p-2.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-all active:scale-90" title="Editar"><Edit2 size={16} /></button>
-                                <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteProduct(product.id); }} className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-all active:scale-90" title="Excluir"><Trash2 size={16} /></button>
+                                <button type="button" onClick={(e) => { e.stopPropagation(); handleEditClick(product); }} className="p-3 text-blue-500 hover:bg-blue-50 rounded-lg transition-all active:scale-95" title="Editar"><Edit2 size={18} /></button>
+                                <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteProduct(product.id); }} className="p-3 text-rose-500 hover:bg-rose-50 rounded-lg transition-all active:scale-95" title="Excluir"><Trash2 size={18} /></button>
                               </div>
                             </td>
                           </tr>
@@ -681,6 +686,7 @@ const ProductModal: React.FC<{ categories: Category[]; locations: Location[]; pr
         <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
           {product && (
             <button 
+              type="button"
               onClick={() => onDelete(product.id)} 
               className="p-4 bg-rose-50 text-rose-600 rounded-2xl font-black hover:bg-rose-100 transition-colors active:scale-95" 
               title="Excluir Produto Permanentemente"
