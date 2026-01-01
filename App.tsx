@@ -69,7 +69,6 @@ const App: React.FC = () => {
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
   const [isDeleteCategoryModalOpen, setIsDeleteCategoryModalOpen] = useState(false);
 
-  // Estados para exclusão de local
   const [locationToDelete, setLocationToDelete] = useState<Location | null>(null);
   const [isDeleteLocationModalOpen, setIsDeleteLocationModalOpen] = useState(false);
 
@@ -92,13 +91,14 @@ const App: React.FC = () => {
     setIsProductModalOpen(true);
   };
 
-  const handleDeleteProduct = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    if (window.confirm('Tem certeza que deseja excluir este produto do estoque?')) {
+  const handleDeleteProduct = (id: string) => {
+    if (window.confirm('Tem certeza que deseja excluir este produto permanentemente?')) {
       setState(prev => ({
         ...prev,
         products: prev.products.filter(p => p.id !== id)
       }));
+      setIsProductModalOpen(false);
+      setEditingProduct(null);
     }
   };
 
@@ -172,40 +172,28 @@ const App: React.FC = () => {
 
   const handleRemoveCategoryClick = (e: React.MouseEvent, cat: Category) => {
     e.stopPropagation();
-    
     if (state.categories.length <= 1) {
-      alert('Não é possível excluir a última categoria do sistema. Deve haver pelo menos uma categoria ativa.');
+      alert('Não é possível excluir a última categoria do sistema.');
       return;
     }
-
     const linkedProducts = state.products.filter(p => p.categoryId === cat.id);
-    
     if (linkedProducts.length > 0) {
       setCategoryToDelete(cat);
       setIsDeleteCategoryModalOpen(true);
     } else {
       if (window.confirm(`Tem certeza que deseja excluir a categoria "${cat.name}"?`)) {
-        setState(prev => ({
-          ...prev,
-          categories: prev.categories.filter(c => c.id !== cat.id)
-        }));
+        setState(prev => ({ ...prev, categories: prev.categories.filter(c => c.id !== cat.id) }));
       }
     }
   };
 
   const handleConfirmCategoryDeletion = (targetCategoryId: string) => {
     if (!categoryToDelete) return;
-
     setState(prev => ({
       ...prev,
       categories: prev.categories.filter(c => c.id !== categoryToDelete.id),
-      products: prev.products.map(p => 
-        p.categoryId === categoryToDelete.id 
-          ? { ...p, categoryId: targetCategoryId, lastUpdated: new Date().toISOString() } 
-          : p
-      )
+      products: prev.products.map(p => p.categoryId === categoryToDelete.id ? { ...p, categoryId: targetCategoryId, lastUpdated: new Date().toISOString() } : p)
     }));
-
     setIsDeleteCategoryModalOpen(false);
     setCategoryToDelete(null);
   };
@@ -219,40 +207,28 @@ const App: React.FC = () => {
 
   const handleRemoveLocationClick = (e: React.MouseEvent, loc: Location) => {
     e.stopPropagation();
-
     if (state.locations.length <= 1) {
-      alert('Não é possível excluir o último local do sistema. Deve haver pelo menos um local ativo.');
+      alert('Não é possível excluir o último local do sistema.');
       return;
     }
-
     const linkedProducts = state.products.filter(p => p.locationId === loc.id);
-
     if (linkedProducts.length > 0) {
       setLocationToDelete(loc);
       setIsDeleteLocationModalOpen(true);
     } else {
       if (window.confirm(`Tem certeza que deseja excluir o local "${loc.name}"?`)) {
-        setState(prev => ({
-          ...prev,
-          locations: prev.locations.filter(l => l.id !== loc.id)
-        }));
+        setState(prev => ({ ...prev, locations: prev.locations.filter(l => l.id !== loc.id) }));
       }
     }
   };
 
   const handleConfirmLocationDeletion = (targetLocationId: string) => {
     if (!locationToDelete) return;
-
     setState(prev => ({
       ...prev,
       locations: prev.locations.filter(l => l.id !== locationToDelete.id),
-      products: prev.products.map(p => 
-        p.locationId === locationToDelete.id 
-          ? { ...p, locationId: targetLocationId, lastUpdated: new Date().toISOString() } 
-          : p
-      )
+      products: prev.products.map(p => p.locationId === locationToDelete.id ? { ...p, locationId: targetLocationId, lastUpdated: new Date().toISOString() } : p)
     }));
-
     setIsDeleteLocationModalOpen(false);
     setLocationToDelete(null);
   };
@@ -260,12 +236,10 @@ const App: React.FC = () => {
   const handleAddTransaction = (data: { productId: string; quantity: number; reason: string; type: TransactionType }) => {
     const product = state.products.find(p => p.id === data.productId);
     if (!product) return;
-
     if (data.type === TransactionType.OUT && product.quantity < data.quantity) {
       alert('Estoque insuficiente!');
       return;
     }
-
     const newTransaction: Transaction = {
       id: Math.random().toString(36).substr(2, 9),
       productId: data.productId,
@@ -275,15 +249,10 @@ const App: React.FC = () => {
       reason: data.reason,
       unitPrice: product.costPrice
     };
-
     setState(prev => ({
       ...prev,
       transactions: [newTransaction, ...prev.transactions],
-      products: prev.products.map(p => 
-        p.id === data.productId 
-          ? { ...p, quantity: p.quantity + (data.type === TransactionType.IN ? data.quantity : -data.quantity), lastUpdated: new Date().toISOString() }
-          : p
-      )
+      products: prev.products.map(p => p.id === data.productId ? { ...p, quantity: p.quantity + (data.type === TransactionType.IN ? data.quantity : -data.quantity), lastUpdated: new Date().toISOString() } : p)
     }));
     setIsTransactionModalOpen(false);
   };
@@ -296,9 +265,7 @@ const App: React.FC = () => {
   };
 
   const filteredProducts = useMemo(() => {
-    let result = state.products.filter(p => 
-      p.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    let result = state.products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
     if (filterCategory !== 'all') result = result.filter(p => p.categoryId === filterCategory);
     if (filterLowStock) result = result.filter(p => p.quantity <= (p.minStock || 0));
     result.sort((a, b) => {
@@ -313,23 +280,14 @@ const App: React.FC = () => {
     return result;
   }, [state.products, searchTerm, filterCategory, sortBy, filterLowStock]);
 
-  const totalStockValue = useMemo(() => 
-    state.products.reduce((acc, p) => acc + (p.quantity * p.costPrice), 0),
-    [state.products]
-  );
-
-  const lowStockCount = useMemo(() => 
-    state.products.filter(p => p.quantity <= (p.minStock || 0)).length,
-    [state.products]
-  );
+  const totalStockValue = useMemo(() => state.products.reduce((acc, p) => acc + (p.quantity * p.costPrice), 0), [state.products]);
+  const lowStockCount = useMemo(() => state.products.filter(p => p.quantity <= (p.minStock || 0)).length, [state.products]);
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden text-slate-900 font-inter">
       <aside className="w-64 bg-slate-900 text-white flex flex-col hidden md:flex shrink-0">
         <div className="p-6 flex items-center gap-3">
-          <div className="p-2 bg-blue-600 rounded-lg">
-            <Package className="w-6 h-6" />
-          </div>
+          <div className="p-2 bg-blue-600 rounded-lg"><Package className="w-6 h-6" /></div>
           <h1 className="text-xl font-bold tracking-tight">GestorPro</h1>
         </div>
         <nav className="flex-1 px-4 py-4 space-y-1">
@@ -353,8 +311,6 @@ const App: React.FC = () => {
             <input type="text" placeholder="Buscar em estoque..." className="bg-transparent border-none focus:ring-0 text-sm w-full outline-none font-medium" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
           <div className="flex items-center gap-2 sm:gap-3 ml-4">
-            <button onClick={() => {setTransactionType(TransactionType.IN); setIsTransactionModalOpen(true);}} className="hidden lg:flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-100 transition-colors"><ArrowDownLeft size={18} /> Entrada</button>
-            <button onClick={() => {setTransactionType(TransactionType.OUT); setIsTransactionModalOpen(true);}} className="hidden lg:flex items-center gap-2 bg-rose-50 text-rose-700 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-rose-100 transition-colors"><ArrowUpRight size={18} /> Saída</button>
             <button onClick={() => { setEditingProduct(null); setIsProductModalOpen(true); }} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors shadow-md whitespace-nowrap"><Plus size={18} /> <span className="hidden sm:inline">Novo Produto</span></button>
           </div>
         </header>
@@ -389,23 +345,34 @@ const App: React.FC = () => {
                   </div>
                   <div className="text-xs font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">Total em Estoque: <span className="text-blue-600 font-bold">R$ {totalStockValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
                 </div>
-                {filterLowStock && (
-                  <div className="flex items-center justify-between bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 animate-in slide-in-from-top-2 duration-200">
-                    <div className="flex items-center gap-2 text-amber-800 text-xs font-bold uppercase tracking-tight"><AlertTriangle size={16} />Filtrando: Produtos com estoque baixo</div>
-                    <button onClick={() => setFilterLowStock(false)} className="text-amber-800 hover:text-amber-900 font-bold text-xs uppercase underline underline-offset-2 flex items-center gap-1"><X size={14} /> Limpar Filtro</button>
+                
+                {/* Banner de Limpeza de Filtros */}
+                {(filterLowStock || filterCategory !== 'all') && (
+                  <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-lg px-4 py-2 animate-in slide-in-from-top-2 duration-200">
+                    <div className="flex items-center gap-2 text-blue-800 text-xs font-bold uppercase tracking-tight">
+                      <Filter size={16} />
+                      Filtros ativos: {filterLowStock ? 'Estoque Baixo' : ''} {filterCategory !== 'all' ? `• Categoria: ${state.categories.find(c => c.id === filterCategory)?.name}` : ''}
+                    </div>
+                    <button 
+                      onClick={() => { setFilterLowStock(false); setFilterCategory('all'); }} 
+                      className="text-blue-800 hover:text-blue-900 font-black text-[10px] uppercase underline underline-offset-4 flex items-center gap-1"
+                    >
+                      <X size={14} /> LIMPAR TUDO
+                    </button>
                   </div>
                 )}
               </div>
+              
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center"><h2 className="font-bold text-slate-800">Catálogo de Produtos</h2><span className="text-xs text-slate-500 uppercase font-bold tracking-wider">{filteredProducts.length} itens encontrados</span></div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead className="bg-slate-50 text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-wider">
-                      <tr><th className="px-6 py-4">Produto</th><th className="px-6 py-4 hidden sm:table-cell">Categoria</th><th className="px-6 py-4">Estoque / Mín</th><th className="px-6 py-4">Valor Unit.</th><th className="px-6 py-4 hidden lg:table-cell">Total Item</th><th className="px-6 py-4 text-right">Ações</th></tr>
+                      <tr><th className="px-6 py-4">Produto</th><th className="px-6 py-4 hidden sm:table-cell">Categoria</th><th className="px-6 py-4">Estoque / Mín</th><th className="px-6 py-4">Valor Unit.</th><th className="px-6 py-4 text-right">Ações</th></tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {filteredProducts.length === 0 ? (
-                        <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic font-medium">Nenhum produto encontrado</td></tr>
+                        <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic font-medium">Nenhum produto encontrado com os filtros atuais</td></tr>
                       ) : filteredProducts.map(product => {
                         const isLowStock = product.quantity <= (product.minStock || 0);
                         const cat = state.categories.find(c => c.id === product.categoryId);
@@ -416,11 +383,10 @@ const App: React.FC = () => {
                             <td className="px-6 py-4 hidden sm:table-cell"><span className={`px-2 py-0.5 rounded-full text-[10px] font-black text-white whitespace-nowrap ${cat?.color || 'bg-slate-400'}`}>{cat?.emoji} {cat?.name || 'Geral'}</span></td>
                             <td className="px-6 py-4"><div className={`flex items-center gap-1.5 font-bold text-xs md:text-sm whitespace-nowrap ${isLowStock ? 'text-rose-600' : 'text-slate-700'}`}>{product.quantity} / {product.minStock || 0}{isLowStock && <AlertTriangle size={14} className="flex-shrink-0" />}</div></td>
                             <td className="px-6 py-4 text-slate-600 font-mono text-xs md:text-sm whitespace-nowrap font-medium">R$ {product.costPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                            <td className="px-6 py-4 hidden lg:table-cell text-blue-600 font-bold font-mono text-sm whitespace-nowrap">R$ {(product.quantity * product.costPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                             <td className="px-6 py-4 text-right">
-                              <div className="flex justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                                <button onClick={(e) => { e.stopPropagation(); handleEditClick(product); }} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg"><Edit2 size={16} /></button>
-                                <button onClick={(e) => handleDeleteProduct(e, product.id)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={16} /></button>
+                              <div className="flex justify-end gap-1">
+                                <button onClick={(e) => { e.stopPropagation(); handleEditClick(product); }} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all active:scale-90"><Edit2 size={16} /></button>
+                                <button onClick={(e) => { e.stopPropagation(); handleDeleteProduct(product.id); }} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all active:scale-90"><Trash2 size={16} /></button>
                               </div>
                             </td>
                           </tr>
@@ -436,14 +402,15 @@ const App: React.FC = () => {
           {activeTab === 'transactions' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center px-2"><h2 className="font-bold text-slate-800 text-lg">Histórico de Transações</h2><span className="text-xs text-slate-500 font-bold uppercase tracking-tight">{state.transactions.length} registros</span></div>
-              {state.transactions.length === 0 ? (
-                <div className="bg-white rounded-2xl p-12 text-center text-slate-400 border border-slate-200 border-dashed font-medium">Nenhuma movimentação registrada.</div>
-              ) : state.transactions.map(transaction => {
+              {state.transactions.map(transaction => {
                 const product = state.products.find(p => p.id === transaction.productId);
                 return (
-                  <div key={transaction.id} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-4 hover:shadow-sm transition-shadow">
+                  <div key={transaction.id} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-4 shadow-sm">
                     <div className={`p-2.5 rounded-full shrink-0 ${transaction.type === TransactionType.IN ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>{transaction.type === TransactionType.IN ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}</div>
-                    <div className="flex-1 min-w-0"><div className="flex justify-between items-start gap-2"><h4 className="font-bold text-slate-900 truncate">{product?.name || 'Produto Excluído'}</h4><span className="text-[10px] text-slate-400 font-bold whitespace-nowrap uppercase">{new Date(transaction.date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</span></div><p className="text-xs text-slate-500 italic truncate font-medium">"{transaction.reason || 'Sem motivo informado'}"</p></div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start gap-2"><h4 className="font-bold text-slate-900 truncate">{product?.name || 'Produto Excluído'}</h4><span className="text-[10px] text-slate-400 font-bold whitespace-nowrap uppercase">{new Date(transaction.date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</span></div>
+                      <p className="text-xs text-slate-500 italic truncate font-medium">"{transaction.reason || 'Sem motivo informado'}"</p>
+                    </div>
                     <div className="text-right shrink-0"><div className={`text-base font-bold ${transaction.type === TransactionType.IN ? 'text-emerald-600' : 'text-rose-600'}`}>{transaction.type === TransactionType.IN ? '+' : '-'}{transaction.quantity}</div><div className="text-[10px] text-slate-400 uppercase font-black tracking-widest">UN</div></div>
                   </div>
                 );
@@ -503,24 +470,20 @@ const App: React.FC = () => {
           <MobileNavItem active={activeTab === 'products'} onClick={() => setActiveTab('products')} icon={<Package size={22}/>} label="Estoque" />
           <div className="relative"><div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center -mt-10 border-4 border-slate-900 shadow-lg active:scale-95 transition-transform cursor-pointer" onClick={() => setIsActionMenuOpen(true)}><Plus size={24} className="text-white" /></div></div>
           <MobileNavItem active={activeTab === 'transactions'} onClick={() => setActiveTab('transactions')} icon={<History size={22}/>} label="Histórico" />
-          <MobileNavItem active={activeTab === 'config'} onClick={() => setActiveTab('config')} icon={<Settings size={22}/>} label="Ajustes" />
+          <MobileNavItem active={activeTab === 'config'} onClick={() => setActiveTab('config'} icon={<Settings size={22}/>} label="Ajustes" />
         </div>
-
-        {isActionMenuOpen && (
-          <div className="md:hidden fixed inset-0 z-[60] flex items-end justify-center px-4 pb-28">
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsActionMenuOpen(false)} />
-            <div className="relative w-full max-sm bg-white rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-10 duration-200">
-              <div className="flex justify-between items-center mb-6"><h3 className="text-lg font-black text-slate-800">Escolha uma ação</h3><button onClick={() => setIsActionMenuOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full"><X size={20}/></button></div>
-              <div className="grid grid-cols-2 gap-4">
-                <button onClick={() => { setIsActionMenuOpen(false); setEditingProduct(null); setIsProductModalOpen(true); }} className="flex flex-col items-center gap-3 p-5 bg-blue-50 rounded-2xl border border-blue-100 group active:scale-95 transition-all"><div className="p-3 bg-blue-600 text-white rounded-xl shadow-md group-hover:scale-110 transition-transform"><Package size={24} /></div><span className="text-xs font-black text-blue-900 uppercase tracking-tight">Novo Produto</span></button>
-                <button onClick={() => { setIsActionMenuOpen(false); setTransactionType(TransactionType.OUT); setIsTransactionModalOpen(true); }} className="flex flex-col items-center gap-3 p-5 bg-rose-50 rounded-2xl border border-rose-100 group active:scale-95 transition-all"><div className="p-3 bg-rose-600 text-white rounded-xl shadow-md group-hover:scale-110 transition-transform"><ArrowUpRight size={24} /></div><span className="text-xs font-black text-rose-900 uppercase tracking-tight">Múltiplas Saídas</span></button>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
 
-      {isProductModalOpen && <ProductModal categories={state.categories} locations={state.locations} product={editingProduct} onClose={() => { setIsProductModalOpen(false); setEditingProduct(null); }} onSave={handleSaveProduct} />}
+      {isProductModalOpen && (
+        <ProductModal 
+          categories={state.categories} 
+          locations={state.locations} 
+          product={editingProduct} 
+          onClose={() => { setIsProductModalOpen(false); setEditingProduct(null); }} 
+          onSave={handleSaveProduct} 
+          onDelete={handleDeleteProduct}
+        />
+      )}
       {isTransactionModalOpen && <TransactionModal products={state.products} type={transactionType} onClose={() => setIsTransactionModalOpen(false)} onSave={handleAddTransaction} />}
       {isCategoryModalOpen && <CategoryModal category={editingCategory} onClose={() => { setIsCategoryModalOpen(false); setEditingCategory(null); }} onSave={handleSaveCategory} />}
       {isDeleteCategoryModalOpen && categoryToDelete && (
@@ -566,135 +529,44 @@ const CategoryModal: React.FC<{ category: Category | null; onClose: () => void; 
     color: category?.color || 'bg-blue-500',
     emoji: category?.emoji || '📦'
   });
-
   const colors = [
-    { name: 'Azul', value: 'bg-blue-500' },
-    { name: 'Verde', value: 'bg-green-500' },
-    { name: 'Roxo', value: 'bg-purple-500' },
-    { name: 'Rosa', value: 'bg-rose-500' },
-    { name: 'Laranja', value: 'bg-amber-500' },
-    { name: 'Esmeralda', value: 'bg-emerald-500' },
-    { name: 'Vermelho', value: 'bg-red-500' },
-    { name: 'Indigo', value: 'bg-indigo-500' }
+    { name: 'Azul', value: 'bg-blue-500' }, { name: 'Verde', value: 'bg-green-500' }, { name: 'Roxo', value: 'bg-purple-500' }, { name: 'Rosa', value: 'bg-rose-500' },
+    { name: 'Laranja', value: 'bg-amber-500' }, { name: 'Esmeralda', value: 'bg-emerald-500' }, { name: 'Vermelho', value: 'bg-red-500' }, { name: 'Indigo', value: 'bg-indigo-500' }
   ];
-
   const emojis = ['📦', '💻', '🍎', '🖇️', '👕', '💊', '🛠️', '⚽', '🚗', '🧴', '🔋', '🏠', '✨', '🔥'];
-
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in duration-200">
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="text-xl font-black text-slate-900">{category ? 'Editar Categoria' : 'Nova Categoria'}</h3>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:bg-slate-100 rounded-full"><X size={24} /></button>
-        </div>
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center"><h3 className="text-xl font-black text-slate-900">{category ? 'Editar Categoria' : 'Nova Categoria'}</h3><button onClick={onClose} className="p-1 text-slate-400 hover:bg-slate-100 rounded-full"><X size={24} /></button></div>
         <div className="p-6 space-y-6">
-          <div className="space-y-1">
-            <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Nome</label>
-            <input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Ex: Informática" className="w-full border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-blue-500 outline-none border font-bold" />
-          </div>
-          
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Emoji / Ícone</label>
-              <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-lg border border-blue-100">
-                <Smile size={14} className="text-blue-600" />
-                <input 
-                  type="text" 
-                  maxLength={2} 
-                  placeholder="Ou use o seu..." 
-                  className="bg-transparent text-xs font-bold text-blue-900 w-24 outline-none"
-                  value={formData.emoji}
-                  onChange={e => setFormData({...formData, emoji: e.target.value})}
-                />
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-1">
-              {emojis.map(e => (
-                <button key={e} onClick={() => setFormData({...formData, emoji: e})} className={`w-10 h-10 flex items-center justify-center text-xl rounded-xl transition-all ${formData.emoji === e ? 'bg-blue-100 ring-2 ring-blue-500 scale-110' : 'bg-slate-50 hover:bg-slate-100'}`}>{e}</button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Cor</label>
-            <div className="flex flex-wrap gap-3">
-              {colors.map(c => (
-                <button key={c.value} onClick={() => setFormData({...formData, color: c.value})} className={`w-8 h-8 rounded-full ${c.value} transition-all ${formData.color === c.value ? 'ring-4 ring-offset-2 ring-blue-500 scale-110' : 'hover:scale-110'}`} title={c.name}></button>
-              ))}
-            </div>
-          </div>
+          <div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Nome</label><input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-blue-500 outline-none border font-bold text-slate-800" /></div>
+          <div className="space-y-2"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Emoji</label><div className="flex flex-wrap gap-2">{emojis.map(e => <button key={e} onClick={() => setFormData({...formData, emoji: e})} className={`w-10 h-10 flex items-center justify-center text-xl rounded-xl transition-all ${formData.emoji === e ? 'bg-blue-100 ring-2 ring-blue-500 scale-110' : 'bg-slate-50 hover:bg-slate-100'}`}>{e}</button>)}</div></div>
+          <div className="space-y-2"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Cor</label><div className="flex flex-wrap gap-3">{colors.map(c => <button key={c.value} onClick={() => setFormData({...formData, color: c.value})} className={`w-8 h-8 rounded-full ${c.value} transition-all ${formData.color === c.value ? 'ring-4 ring-offset-2 ring-blue-500 scale-110' : ''}`} />)}</div></div>
         </div>
-        <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
-          <button onClick={onClose} className="flex-1 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-700 hover:bg-slate-100 uppercase tracking-tighter transition-all">Cancelar</button>
-          <button onClick={() => onSave(formData)} disabled={!formData.name} className="flex-1 py-4 bg-blue-600 rounded-2xl font-black text-white hover:bg-blue-700 shadow-lg uppercase tracking-tighter disabled:opacity-50 transition-all">{category ? 'Salvar' : 'Criar'}</button>
-        </div>
+        <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3"><button onClick={onClose} className="flex-1 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-700 uppercase tracking-tighter">Cancelar</button><button onClick={() => onSave(formData)} disabled={!formData.name} className="flex-1 py-4 bg-blue-600 rounded-2xl font-black text-white hover:bg-blue-700 shadow-lg uppercase tracking-tighter">Salvar</button></div>
       </div>
     </div>
   );
 };
 
-// Modal Genérico de Remanejamento (utilizado para Categoria ou Local)
-const RelocationModal: React.FC<{ 
-  title: string;
-  item: Category | Location; 
-  options: (Category | Location)[]; 
-  type: 'category' | 'location';
-  onClose: () => void; 
-  onConfirm: (targetId: string) => void 
-}> = ({ title, item, options, type, onClose, onConfirm }) => {
+const RelocationModal: React.FC<{ title: string; item: Category | Location; options: (Category | Location)[]; type: 'category' | 'location'; onClose: () => void; onConfirm: (targetId: string) => void }> = ({ title, item, options, type, onClose, onConfirm }) => {
   const [targetId, setTargetId] = useState(options[0]?.id || '');
-
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in duration-200">
-        <div className="p-6 bg-rose-600 border-b border-rose-700 flex justify-between items-center shrink-0">
-          <h3 className="text-xl font-black text-white flex items-center gap-2">
-            <Trash2 size={24} /> {title}
-          </h3>
-          <button onClick={onClose} className="text-white/80 hover:text-white"><X size={24} /></button>
+        <div className="p-6 bg-rose-600 border-b border-rose-700 flex justify-between items-center"><h3 className="text-xl font-black text-white flex items-center gap-2"><Trash2 size={24} /> {title}</h3><button onClick={onClose} className="text-white/80 hover:text-white"><X size={24} /></button></div>
+        <div className="p-6 space-y-6 text-center">
+          <p className="text-slate-600 font-medium">O {type === 'category' ? 'item' : 'local'} <span className="font-bold text-slate-900">"{item.name}"</span> possui produtos vinculados.</p>
+          <p className="text-sm text-slate-500 mt-2">Escolha um novo destino para estes produtos:</p>
+          <div className="space-y-2 text-left mt-4"><label className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><ArrowRightLeft size={14} /> Mover para:</label><select className="w-full border-slate-200 rounded-2xl p-4 outline-none border bg-white font-bold text-slate-800" value={targetId} onChange={e => setTargetId(e.target.value)}>{options.map(opt => <option key={opt.id} value={opt.id}>{'emoji' in opt ? `${opt.emoji} ${opt.name}` : opt.name}</option>)}</select></div>
         </div>
-        <div className="p-6 space-y-6">
-          <div className="text-center">
-            <p className="text-slate-600 font-medium">
-              O {type === 'category' ? 'item' : 'local'} <span className="font-bold text-slate-900">"{item.name}"</span> possui produtos vinculados. 
-            </p>
-            <p className="text-sm text-slate-500 mt-2">
-              Para prosseguir com a exclusão, você deve escolher um novo destino para estes produtos:
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-              <ArrowRightLeft size={14} /> Mover produtos para:
-            </label>
-            <select 
-              className="w-full border-slate-200 rounded-2xl p-4 outline-none border bg-white font-bold text-slate-800"
-              value={targetId}
-              onChange={e => setTargetId(e.target.value)}
-            >
-              {options.map(opt => (
-                <option key={opt.id} value={opt.id}>
-                  {'emoji' in opt ? `${opt.emoji} ${opt.name}` : opt.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
-          <button onClick={onClose} className="flex-1 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-700 hover:bg-slate-100 uppercase tracking-tighter transition-all">Cancelar</button>
-          <button 
-            onClick={() => onConfirm(targetId)} 
-            className="flex-1 py-4 bg-rose-600 rounded-2xl font-black text-white hover:bg-rose-700 shadow-lg uppercase tracking-tighter transition-all"
-          >
-            Mover e Excluir
-          </button>
-        </div>
+        <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3"><button onClick={onClose} className="flex-1 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-700 uppercase tracking-tighter">Cancelar</button><button onClick={() => onConfirm(targetId)} className="flex-1 py-4 bg-rose-600 rounded-2xl font-black text-white hover:bg-rose-700 shadow-lg uppercase tracking-tighter">Mover e Excluir</button></div>
       </div>
     </div>
   );
 };
 
-const ProductModal: React.FC<{ categories: Category[]; locations: Location[]; product: Product | null; onClose: () => void; onSave: (p: any) => void }> = ({ categories, locations, product, onClose, onSave }) => {
+const ProductModal: React.FC<{ categories: Category[]; locations: Location[]; product: Product | null; onClose: () => void; onSave: (p: any) => void; onDelete: (id: string) => void }> = ({ categories, locations, product, onClose, onSave, onDelete }) => {
   const [formData, setFormData] = useState({
     name: product?.name || '',
     quantity: product?.quantity || 0,
@@ -706,18 +578,35 @@ const ProductModal: React.FC<{ categories: Category[]; locations: Location[]; pr
   });
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+      <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in duration-200">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center shrink-0"><h3 className="text-xl font-black text-slate-900">{product ? 'Editar Produto' : 'Cadastrar Produto'}</h3><button onClick={onClose} className="p-1 text-slate-400 hover:bg-slate-100 rounded-full"><X size={24} /></button></div>
         <div className="p-6 space-y-5 overflow-y-auto flex-1">
-          <div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Nome</label><input type="text" placeholder="Ex: Teclado Mecânico RGB" className="w-full border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-blue-500 outline-none border transition-all font-bold" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} /></div>
-          <div className="grid grid-cols-2 gap-4"><div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Estoque Atual</label><input type="number" className="w-full border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-blue-500 outline-none border font-bold" value={formData.quantity} onChange={e => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })} /></div><div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Estoque Mínimo</label><input type="number" className="w-full border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-blue-500 outline-none border font-bold" value={formData.minStock} onChange={e => setFormData({ ...formData, minStock: parseInt(e.target.value) || 0 })} /></div></div>
-          <div className="grid grid-cols-2 gap-4"><div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Custo Unitário</label><input type="number" step="0.01" className="w-full border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-blue-500 outline-none border font-bold" value={formData.costPrice} onChange={e => setFormData({ ...formData, costPrice: parseFloat(e.target.value) || 0 })} /></div><div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Vencimento</label><input type="date" className="w-full border-slate-200 rounded-2xl p-4 outline-none border text-sm font-bold" value={formData.expirationDate} onChange={e => setFormData({ ...formData, expirationDate: e.target.value })} /></div></div>
+          <div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Nome do Produto</label><input type="text" placeholder="Ex: Teclado Mecânico RGB" className="w-full border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-blue-500 outline-none border font-bold text-slate-800" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} /></div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Categoria</label><select className="w-full border-slate-200 rounded-2xl p-4 outline-none border text-sm bg-white font-bold" value={formData.categoryId} onChange={e => setFormData({ ...formData, categoryId: e.target.value })}>{categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}</select></div>
-            <div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Localização</label><select className="w-full border-slate-200 rounded-2xl p-4 outline-none border text-sm bg-white font-bold" value={formData.locationId} onChange={e => setFormData({ ...formData, locationId: e.target.value })}>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></div>
+            <div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Estoque Atual</label><input type="number" className="w-full border-slate-200 rounded-2xl p-4 outline-none border font-bold text-slate-800" value={formData.quantity} onChange={e => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })} /></div>
+            <div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Estoque Mínimo</label><input type="number" className="w-full border-slate-200 rounded-2xl p-4 outline-none border font-bold text-slate-800" value={formData.minStock} onChange={e => setFormData({ ...formData, minStock: parseInt(e.target.value) || 0 })} /></div>
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Custo Unitário (R$)</label><input type="number" step="0.01" className="w-full border-slate-200 rounded-2xl p-4 outline-none border font-bold text-slate-800" value={formData.costPrice} onChange={e => setFormData({ ...formData, costPrice: parseFloat(e.target.value) || 0 })} /></div>
+            <div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Categoria</label><select className="w-full border-slate-200 rounded-2xl p-4 outline-none border text-sm font-bold text-slate-800 bg-white" value={formData.categoryId} onChange={e => setFormData({ ...formData, categoryId: e.target.value })}>{categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}</select></div>
+          </div>
+          <div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Localização</label><select className="w-full border-slate-200 rounded-2xl p-4 outline-none border text-sm font-bold text-slate-800 bg-white" value={formData.locationId} onChange={e => setFormData({ ...formData, locationId: e.target.value })}>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></div>
         </div>
-        <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0"><button onClick={onClose} className="flex-1 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-700 hover:bg-slate-100 uppercase tracking-tighter">Cancelar</button><button onClick={() => onSave(formData)} disabled={!formData.name} className="flex-1 py-4 bg-blue-600 rounded-2xl font-black text-white hover:bg-blue-700 shadow-lg uppercase tracking-tighter">{product ? 'Salvar' : 'Concluir'}</button></div>
+        <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
+          {product && (
+            <button 
+              onClick={() => onDelete(product.id)} 
+              className="p-4 bg-rose-50 text-rose-600 rounded-2xl font-black hover:bg-rose-100 transition-colors active:scale-95" 
+              title="Excluir Produto Permanentemente"
+            >
+              <Trash2 size={24} />
+            </button>
+          )}
+          <button onClick={onClose} className="flex-1 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-700 uppercase tracking-tighter">Cancelar</button>
+          <button onClick={() => onSave(formData)} disabled={!formData.name} className="flex-1 py-4 bg-blue-600 rounded-2xl font-black text-white hover:bg-blue-700 shadow-lg uppercase tracking-tighter disabled:opacity-50 transition-all">
+            {product ? 'Salvar Alterações' : 'Concluir Cadastro'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -728,13 +617,19 @@ const TransactionModal: React.FC<{ products: Product[]; type: TransactionType; o
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in duration-200">
-        <div className={`p-6 border-b border-slate-100 flex justify-between items-center ${type === TransactionType.IN ? 'bg-emerald-600' : 'bg-rose-600'}`}><h3 className="text-xl font-black text-white flex items-center gap-2">{type === TransactionType.IN ? <ArrowDownLeft size={24} /> : <ArrowUpRight size={24} />}{type === TransactionType.IN ? 'Entrada' : 'Saída'}</h3><button onClick={onClose} className="text-white/80 hover:text-white"><X size={24} /></button></div>
-        <div className="p-6 space-y-5">
-          <div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Item</label><select className="w-full border-slate-200 rounded-2xl p-4 outline-none border bg-white font-bold" value={formData.productId} onChange={e => setFormData({ ...formData, productId: e.target.value })}>{products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.quantity})</option>)}</select></div>
-          <div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Quantidade</label><input type="number" min="1" className="w-full border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-blue-500 outline-none border font-bold" value={formData.quantity} onChange={e => setFormData({ ...formData, quantity: Math.max(1, parseInt(e.target.value) || 0) })} /></div>
-          <div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Observação</label><textarea className="w-full border-slate-200 rounded-2xl p-4 outline-none border min-h-[100px] text-sm resize-none font-bold" placeholder="Motivo da movimentação..." value={formData.reason} onChange={e => setFormData({ ...formData, reason: e.target.value })} /></div>
+        <div className={`p-6 border-b border-slate-100 flex justify-between items-center ${type === TransactionType.IN ? 'bg-emerald-600' : 'bg-rose-600'}`}>
+          <h3 className="text-xl font-black text-white flex items-center gap-2">
+            {type === TransactionType.IN ? <ArrowDownLeft size={24} /> : <ArrowUpRight size={24} />} 
+            {type === TransactionType.IN ? 'Registrar Entrada' : 'Registrar Saída'}
+          </h3>
+          <button onClick={onClose} className="text-white/80 hover:text-white"><X size={24} /></button>
         </div>
-        <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3"><button onClick={onClose} className="flex-1 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-700 hover:bg-slate-100 uppercase tracking-tighter">Voltar</button><button onClick={() => onSave(formData)} disabled={!formData.productId} className={`flex-1 py-4 rounded-2xl font-black text-white shadow-lg uppercase tracking-tighter ${type === TransactionType.IN ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}`}>Confirmar</button></div>
+        <div className="p-6 space-y-5">
+          <div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Produto</label><select className="w-full border-slate-200 rounded-2xl p-4 outline-none border bg-white font-bold text-slate-800" value={formData.productId} onChange={e => setFormData({ ...formData, productId: e.target.value })}>{products.map(p => <option key={p.id} value={p.id}>{p.name} (Saldo: {p.quantity})</option>)}</select></div>
+          <div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Quantidade</label><input type="number" min="1" className="w-full border-slate-200 rounded-2xl p-4 outline-none border font-bold text-slate-800" value={formData.quantity} onChange={e => setFormData({ ...formData, quantity: Math.max(1, parseInt(e.target.value) || 0) })} /></div>
+          <div className="space-y-1"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Observação / Motivo</label><textarea className="w-full border-slate-200 rounded-2xl p-4 outline-none border min-h-[100px] text-sm resize-none font-bold text-slate-700" placeholder="Ex: Compra com fornecedor X ou Venda para cliente Y" value={formData.reason} onChange={e => setFormData({ ...formData, reason: e.target.value })} /></div>
+        </div>
+        <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3"><button onClick={onClose} className="flex-1 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-700 uppercase tracking-tighter">Voltar</button><button onClick={() => onSave(formData)} disabled={!formData.productId} className={`flex-1 py-4 rounded-2xl font-black text-white shadow-lg uppercase tracking-tighter ${type === TransactionType.IN ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}`}>Confirmar Movimentação</button></div>
       </div>
     </div>
   );
