@@ -96,7 +96,8 @@ const App: React.FC = () => {
   };
 
   const handleDeleteProduct = (id: string) => {
-    if (window.confirm('Tem certeza que deseja excluir este produto permanentemente?')) {
+    const confirmDelete = window.confirm('Tem certeza que deseja excluir este produto permanentemente? Esta ação não pode ser desfeita.');
+    if (confirmDelete) {
       setState(prev => ({
         ...prev,
         products: prev.products.filter(p => p.id !== id)
@@ -397,8 +398,8 @@ const App: React.FC = () => {
                             <td className="px-6 py-4 text-slate-600 font-mono text-xs md:text-sm whitespace-nowrap font-medium">R$ {product.costPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex justify-end gap-1">
-                                <button onClick={(e) => { e.stopPropagation(); handleEditClick(product); }} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all active:scale-90"><Edit2 size={16} /></button>
-                                <button onClick={(e) => { e.stopPropagation(); handleDeleteProduct(product.id); }} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all active:scale-90"><Trash2 size={16} /></button>
+                                <button type="button" onClick={(e) => { e.stopPropagation(); handleEditClick(product); }} className="p-2.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-all active:scale-90" title="Editar"><Edit2 size={16} /></button>
+                                <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteProduct(product.id); }} className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-all active:scale-90" title="Excluir"><Trash2 size={16} /></button>
                               </div>
                             </td>
                           </tr>
