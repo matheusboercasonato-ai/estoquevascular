@@ -63,8 +63,12 @@ const App: React.FC = () => {
 
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
   const [isDeleteCategoryModalOpen, setIsDeleteCategoryModalOpen] = useState(false);
@@ -170,6 +174,22 @@ const App: React.FC = () => {
     setEditingCategory(null);
   };
 
+  const handleSaveLocation = (locData: Omit<Location, 'id'>) => {
+    setState(prev => {
+      if (editingLocation) {
+        return {
+          ...prev,
+          locations: prev.locations.map(l => l.id === editingLocation.id ? { ...l, ...locData } : l)
+        };
+      } else {
+        const newLoc: Location = { ...locData, id: Math.random().toString(36).substr(2, 9) };
+        return { ...prev, locations: [...prev.locations, newLoc] };
+      }
+    });
+    setIsLocationModalOpen(false);
+    setEditingLocation(null);
+  };
+
   const handleRemoveCategoryClick = (e: React.MouseEvent, cat: Category) => {
     e.stopPropagation();
     if (state.categories.length <= 1) {
@@ -196,13 +216,6 @@ const App: React.FC = () => {
     }));
     setIsDeleteCategoryModalOpen(false);
     setCategoryToDelete(null);
-  };
-
-  const handleAddLocation = () => {
-    const name = prompt('Nome do novo local:');
-    if (!name) return;
-    const newLoc: Location = { id: Math.random().toString(36).substr(2, 9), name };
-    setState(prev => ({ ...prev, locations: [...prev.locations, newLoc] }));
   };
 
   const handleRemoveLocationClick = (e: React.MouseEvent, loc: Location) => {
@@ -346,7 +359,6 @@ const App: React.FC = () => {
                   <div className="text-xs font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">Total em Estoque: <span className="text-blue-600 font-bold">R$ {totalStockValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
                 </div>
                 
-                {/* Banner de Limpeza de Filtros */}
                 {(filterLowStock || filterCategory !== 'all') && (
                   <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-lg px-4 py-2 animate-in slide-in-from-top-2 duration-200">
                     <div className="flex items-center gap-2 text-blue-800 text-xs font-bold uppercase tracking-tight">
@@ -445,7 +457,7 @@ const App: React.FC = () => {
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                   <div className="flex justify-between items-center mb-6">
                     <div><h3 className="font-bold text-lg text-slate-800">Locais de Armazenamento</h3><p className="text-xs text-slate-400 font-medium">Prateleiras, corredores ou unidades</p></div>
-                    <button onClick={handleAddLocation} className="text-blue-600 text-sm font-black uppercase tracking-tight flex items-center gap-1 px-3 py-1.5 hover:bg-blue-50 rounded-lg transition-colors"><Plus size={16} /> NOVO</button>
+                    <button onClick={() => { setEditingLocation(null); setIsLocationModalOpen(true); }} className="text-blue-600 text-sm font-black uppercase tracking-tight flex items-center gap-1 px-3 py-1.5 hover:bg-blue-50 rounded-lg transition-colors"><Plus size={16} /> NOVO</button>
                   </div>
                   <div className="space-y-3">
                     {state.locations.map(loc => (
@@ -454,6 +466,7 @@ const App: React.FC = () => {
                           <MapPin className="text-slate-400 shrink-0" size={18} />
                           <span className="flex-1 font-bold text-slate-800">{loc.name}</span>
                           <div className="flex gap-1">
+                             <button onClick={(e) => { e.stopPropagation(); setEditingLocation(loc); setIsLocationModalOpen(true); }} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Editar"><Edit2 size={18} /></button>
                              <button onClick={(e) => handleRemoveLocationClick(e, loc)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors" title="Excluir"><Trash2 size={18} /></button>
                           </div>
                         </div>
@@ -468,10 +481,49 @@ const App: React.FC = () => {
         <div className="md:hidden fixed bottom-6 left-4 right-4 bg-slate-900 text-white rounded-2xl shadow-2xl flex justify-around items-center p-3 z-30 border border-slate-800/50 backdrop-blur-md">
           <MobileNavItem active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<LayoutGrid size={22}/>} label="Início" />
           <MobileNavItem active={activeTab === 'products'} onClick={() => setActiveTab('products')} icon={<Package size={22}/>} label="Estoque" />
-          <div className="relative"><div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center -mt-10 border-4 border-slate-900 shadow-lg active:scale-95 transition-transform cursor-pointer" onClick={() => setIsActionMenuOpen(true)}><Plus size={24} className="text-white" /></div></div>
+          <div className="relative">
+            <button className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center -mt-10 border-4 border-slate-900 shadow-lg active:scale-95 transition-transform cursor-pointer" onClick={() => setIsActionMenuOpen(true)}>
+              <Plus size={24} className="text-white" />
+            </button>
+          </div>
           <MobileNavItem active={activeTab === 'transactions'} onClick={() => setActiveTab('transactions')} icon={<History size={22}/>} label="Histórico" />
-          <MobileNavItem active={activeTab === 'config'} onClick={() => setActiveTab('config'} icon={<Settings size={22}/>} label="Ajustes" />
+          <MobileNavItem active={activeTab === 'config'} onClick={() => setActiveTab('config')} icon={<Settings size={22}/>} label="Ajustes" />
         </div>
+
+        {isActionMenuOpen && (
+          <div className="md:hidden fixed inset-0 z-[60] flex items-end justify-center px-4 pb-28">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsActionMenuOpen(false)} />
+            <div className="relative w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-10 duration-200">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Ações Rápidas</h3>
+                <button onClick={() => setIsActionMenuOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full"><X size={20}/></button>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                <button 
+                  onClick={() => { setIsActionMenuOpen(false); setEditingProduct(null); setIsProductModalOpen(true); }} 
+                  className="flex items-center gap-4 p-4 bg-blue-50 text-blue-700 rounded-2xl border border-blue-100 active:scale-95 transition-all"
+                >
+                  <div className="p-2 bg-blue-600 text-white rounded-lg shadow-sm"><Package size={20} /></div>
+                  <span className="font-bold">Novo Produto</span>
+                </button>
+                <button 
+                  onClick={() => { setIsActionMenuOpen(false); setTransactionType(TransactionType.IN); setIsTransactionModalOpen(true); }} 
+                  className="flex items-center gap-4 p-4 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-100 active:scale-95 transition-all"
+                >
+                  <div className="p-2 bg-emerald-600 text-white rounded-lg shadow-sm"><ArrowDownLeft size={20} /></div>
+                  <span className="font-bold">Registrar Entrada</span>
+                </button>
+                <button 
+                  onClick={() => { setIsActionMenuOpen(false); setTransactionType(TransactionType.OUT); setIsTransactionModalOpen(true); }} 
+                  className="flex items-center gap-4 p-4 bg-rose-50 text-rose-700 rounded-2xl border border-rose-100 active:scale-95 transition-all"
+                >
+                  <div className="p-2 bg-rose-600 text-white rounded-lg shadow-sm"><ArrowUpRight size={20} /></div>
+                  <span className="font-bold">Registrar Saída</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {isProductModalOpen && (
@@ -486,6 +538,7 @@ const App: React.FC = () => {
       )}
       {isTransactionModalOpen && <TransactionModal products={state.products} type={transactionType} onClose={() => setIsTransactionModalOpen(false)} onSave={handleAddTransaction} />}
       {isCategoryModalOpen && <CategoryModal category={editingCategory} onClose={() => { setIsCategoryModalOpen(false); setEditingCategory(null); }} onSave={handleSaveCategory} />}
+      {isLocationModalOpen && <LocationModal location={editingLocation} onClose={() => { setIsLocationModalOpen(false); setEditingLocation(null); }} onSave={handleSaveLocation} />}
       {isDeleteCategoryModalOpen && categoryToDelete && (
         <RelocationModal 
           title="Remanejamento de Categoria"
@@ -544,6 +597,38 @@ const CategoryModal: React.FC<{ category: Category | null; onClose: () => void; 
           <div className="space-y-2"><label className="text-xs font-black text-slate-500 uppercase tracking-widest">Cor</label><div className="flex flex-wrap gap-3">{colors.map(c => <button key={c.value} onClick={() => setFormData({...formData, color: c.value})} className={`w-8 h-8 rounded-full ${c.value} transition-all ${formData.color === c.value ? 'ring-4 ring-offset-2 ring-blue-500 scale-110' : ''}`} />)}</div></div>
         </div>
         <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3"><button onClick={onClose} className="flex-1 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-700 uppercase tracking-tighter">Cancelar</button><button onClick={() => onSave(formData)} disabled={!formData.name} className="flex-1 py-4 bg-blue-600 rounded-2xl font-black text-white hover:bg-blue-700 shadow-lg uppercase tracking-tighter">Salvar</button></div>
+      </div>
+    </div>
+  );
+};
+
+const LocationModal: React.FC<{ location: Location | null; onClose: () => void; onSave: (d: any) => void }> = ({ location, onClose, onSave }) => {
+  const [formData, setFormData] = useState({
+    name: location?.name || '',
+  });
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in duration-200">
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+          <h3 className="text-xl font-black text-slate-900">{location ? 'Editar Local' : 'Novo Local'}</h3>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:bg-slate-100 rounded-full"><X size={24} /></button>
+        </div>
+        <div className="p-6 space-y-6">
+          <div className="space-y-1">
+            <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Nome do Local</label>
+            <input 
+              type="text" 
+              placeholder="Ex: Corredor A, Prateleira 4"
+              value={formData.name} 
+              onChange={e => setFormData({...formData, name: e.target.value})} 
+              className="w-full border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-blue-500 outline-none border font-bold text-slate-800" 
+            />
+          </div>
+        </div>
+        <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
+          <button onClick={onClose} className="flex-1 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-700 uppercase tracking-tighter">Cancelar</button>
+          <button onClick={() => onSave(formData)} disabled={!formData.name} className="flex-1 py-4 bg-blue-600 rounded-2xl font-black text-white hover:bg-blue-700 shadow-lg uppercase tracking-tighter">Salvar</button>
+        </div>
       </div>
     </div>
   );
