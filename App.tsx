@@ -19,7 +19,10 @@ import {
   Filter,
   ArrowUpDown,
   Smile,
-  ArrowRightLeft
+  ArrowRightLeft,
+  ListPlus,
+  ShoppingCart,
+  MinusCircle
 } from 'lucide-react';
 import { InventoryState, Product, Category, Location, Transaction, TransactionType } from './types';
 import { analyzeInventory } from './services/geminiService';
@@ -76,7 +79,10 @@ const App: React.FC = () => {
   const [locationToDelete, setLocationToDelete] = useState<Location | null>(null);
   const [isDeleteLocationModalOpen, setIsDeleteLocationModalOpen] = useState(false);
 
+  const [productToDeleteId, setProductToDeleteId] = useState<string | null>(null);
+
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [isBulkOutputModalOpen, setIsBulkOutputModalOpen] = useState(false);
   const [transactionType, setTransactionType] = useState<TransactionType>(TransactionType.IN);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -96,20 +102,18 @@ const App: React.FC = () => {
   };
 
   const handleDeleteProduct = (id: string) => {
-    // Usamos um identificador explícito para evitar confusão de contexto
-    if (window.confirm('Deseja excluir permanentemente este produto e todo o seu histórico?')) {
-      setState(prevState => {
-        const newProducts = prevState.products.filter(p => p.id !== id);
-        const newTransactions = prevState.transactions.filter(t => t.productId !== id);
-        return {
-          ...prevState,
-          products: newProducts,
-          transactions: newTransactions
-        };
-      });
-      setIsProductModalOpen(false);
-      setEditingProduct(null);
-    }
+    setState(prevState => {
+      const newProducts = prevState.products.filter(p => p.id !== id);
+      const newTransactions = prevState.transactions.filter(t => t.productId !== id);
+      return {
+        ...prevState,
+        products: newProducts,
+        transactions: newTransactions
+      };
+    });
+    setIsProductModalOpen(false);
+    setEditingProduct(null);
+    setProductToDeleteId(null);
   };
 
   const handleSaveProduct = (productData: Omit<Product, 'id' | 'lastUpdated'>) => {
@@ -276,6 +280,47 @@ const App: React.FC = () => {
     setIsTransactionModalOpen(false);
   };
 
+  const handleBulkOutput = (items: { productId: string; quantity: number }[], reason: string) => {
+    const now = new Date().toISOString();
+    
+    setState(prev => {
+      const newTransactions = [...prev.transactions];
+      const newProducts = [...prev.products];
+
+      items.forEach(item => {
+        const product = newProducts.find(p => p.id === item.productId);
+        if (product) {
+          // Gerar Transação
+          newTransactions.unshift({
+            id: Math.random().toString(36).substr(2, 9),
+            productId: item.productId,
+            type: TransactionType.OUT,
+            quantity: item.quantity,
+            date: now,
+            reason: reason || 'Múltiplas Saídas',
+            unitPrice: product.costPrice
+          });
+
+          // Atualizar Produto
+          const pIdx = newProducts.findIndex(p => p.id === item.productId);
+          newProducts[pIdx] = {
+            ...product,
+            quantity: product.quantity - item.quantity,
+            lastUpdated: now
+          };
+        }
+      });
+
+      return {
+        ...prev,
+        transactions: newTransactions,
+        products: newProducts
+      };
+    });
+
+    setIsBulkOutputModalOpen(false);
+  };
+
   const handleAiAnalyze = async () => {
     setIsAnalyzing(true);
     const result = await analyzeInventory(state);
@@ -324,13 +369,24 @@ const App: React.FC = () => {
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden relative">
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 sticky top-0 z-10 shrink-0">
+        <header className="h-20 md:h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 sticky top-0 z-10 shrink-0">
           <div className="flex items-center bg-slate-100 rounded-full px-4 py-1.5 w-full max-w-md">
             <Search className="text-slate-400 mr-2" size={18} />
             <input type="text" placeholder="Buscar em estoque..." className="bg-transparent border-none focus:ring-0 text-sm w-full outline-none font-medium" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
           <div className="flex items-center gap-2 sm:gap-3 ml-4">
-            <button onClick={() => { setEditingProduct(null); setIsProductModalOpen(true); }} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors shadow-md whitespace-nowrap"><Plus size={18} /> <span className="hidden sm:inline">Novo Produto</span></button>
+            <button 
+              onClick={() => setIsBulkOutputModalOpen(true)} 
+              className="hidden sm:flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-200 transition-colors border border-slate-200 whitespace-nowrap"
+            >
+              <ArrowUpRight size={18} /> Múltiplas Saídas
+            </button>
+            <button 
+              onClick={() => { setEditingProduct(null); setIsProductModalOpen(true); }} 
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors shadow-md whitespace-nowrap"
+            >
+              <Plus size={18} /> <span className="hidden sm:inline">Novo Produto</span>
+            </button>
           </div>
         </header>
 
@@ -403,8 +459,22 @@ const App: React.FC = () => {
                             <td className="px-6 py-4 text-slate-600 font-mono text-xs md:text-sm whitespace-nowrap font-medium">R$ {product.costPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex justify-end gap-1">
-                                <button type="button" onClick={(e) => { e.stopPropagation(); handleEditClick(product); }} className="p-3 text-blue-500 hover:bg-blue-50 rounded-lg transition-all active:scale-95" title="Editar"><Edit2 size={18} /></button>
-                                <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteProduct(product.id); }} className="p-3 text-rose-500 hover:bg-rose-50 rounded-lg transition-all active:scale-95" title="Excluir"><Trash2 size={18} /></button>
+                                <button 
+                                  type="button" 
+                                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleEditClick(product); }} 
+                                  className="p-3 text-blue-500 hover:bg-blue-50 rounded-lg transition-all active:scale-95" 
+                                  title="Editar"
+                                >
+                                  <Edit2 size={18} />
+                                </button>
+                                <button 
+                                  type="button" 
+                                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); setProductToDeleteId(product.id); }} 
+                                  className="p-3 text-rose-500 hover:bg-rose-50 rounded-lg transition-all active:scale-95" 
+                                  title="Excluir"
+                                >
+                                  <Trash2 size={18} className="pointer-events-none" />
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -513,24 +583,58 @@ const App: React.FC = () => {
                   <span className="font-bold">Novo Produto</span>
                 </button>
                 <button 
+                  onClick={() => { setIsActionMenuOpen(false); setIsBulkOutputModalOpen(true); }} 
+                  className="flex items-center gap-4 p-4 bg-orange-50 text-orange-700 rounded-2xl border border-orange-100 active:scale-95 transition-all"
+                >
+                  <div className="p-2 bg-orange-600 text-white rounded-lg shadow-sm"><ArrowUpRight size={20} /></div>
+                  <span className="font-bold">Múltiplas Saídas</span>
+                </button>
+                <button 
                   onClick={() => { setIsActionMenuOpen(false); setTransactionType(TransactionType.IN); setIsTransactionModalOpen(true); }} 
                   className="flex items-center gap-4 p-4 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-100 active:scale-95 transition-all"
                 >
                   <div className="p-2 bg-emerald-600 text-white rounded-lg shadow-sm"><ArrowDownLeft size={20} /></div>
                   <span className="font-bold">Registrar Entrada</span>
                 </button>
-                <button 
-                  onClick={() => { setIsActionMenuOpen(false); setTransactionType(TransactionType.OUT); setIsTransactionModalOpen(true); }} 
-                  className="flex items-center gap-4 p-4 bg-rose-50 text-rose-700 rounded-2xl border border-rose-100 active:scale-95 transition-all"
-                >
-                  <div className="p-2 bg-rose-600 text-white rounded-lg shadow-sm"><ArrowUpRight size={20} /></div>
-                  <span className="font-bold">Registrar Saída</span>
-                </button>
               </div>
             </div>
           </div>
         )}
       </main>
+
+      {/* Modal de Confirmação de Exclusão de Produto */}
+      {productToDeleteId && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in duration-200">
+            <div className="p-6 bg-rose-600 border-b border-rose-700 flex justify-between items-center text-white shrink-0">
+              <h3 className="text-xl font-black flex items-center gap-2 uppercase tracking-tight">
+                <Trash2 size={24} /> Confirmar Exclusão
+              </h3>
+              <button onClick={() => setProductToDeleteId(null)} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-8 text-slate-700 font-medium text-center space-y-2">
+              <p className="text-lg">Deseja excluir permanentemente este produto?</p>
+              <p className="text-sm text-slate-400">Esta ação removerá o item do catálogo e todo o histórico de transações vinculado a ele.</p>
+            </div>
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
+              <button 
+                onClick={() => setProductToDeleteId(null)} 
+                className="flex-1 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-700 uppercase tracking-tighter hover:bg-slate-100 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={() => handleDeleteProduct(productToDeleteId)} 
+                className="flex-1 py-4 bg-rose-600 rounded-2xl font-black text-white hover:bg-rose-700 shadow-lg uppercase tracking-tighter transition-all active:scale-95"
+              >
+                Sim, Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isProductModalOpen && (
         <ProductModal 
@@ -539,9 +643,18 @@ const App: React.FC = () => {
           product={editingProduct} 
           onClose={() => { setIsProductModalOpen(false); setEditingProduct(null); }} 
           onSave={handleSaveProduct} 
-          onDelete={handleDeleteProduct}
+          onDelete={(id) => setProductToDeleteId(id)}
         />
       )}
+      
+      {isBulkOutputModalOpen && (
+        <BulkOutputModal 
+          products={state.products}
+          onClose={() => setIsBulkOutputModalOpen(false)}
+          onSave={handleBulkOutput}
+        />
+      )}
+
       {isTransactionModalOpen && <TransactionModal products={state.products} type={transactionType} onClose={() => setIsTransactionModalOpen(false)} onSave={handleAddTransaction} />}
       {isCategoryModalOpen && <CategoryModal category={editingCategory} onClose={() => { setIsCategoryModalOpen(false); setEditingCategory(null); }} onSave={handleSaveCategory} />}
       {isLocationModalOpen && <LocationModal location={editingLocation} onClose={() => { setIsLocationModalOpen(false); setEditingLocation(null); }} onSave={handleSaveLocation} />}
@@ -703,6 +816,151 @@ const ProductModal: React.FC<{ categories: Category[]; locations: Location[]; pr
     </div>
   );
 }
+
+const BulkOutputModal: React.FC<{ products: Product[]; onClose: () => void; onSave: (items: any[], reason: string) => void }> = ({ products, onClose, onSave }) => {
+  const [selectedItems, setSelectedItems] = useState<{ productId: string; quantity: number }[]>([]);
+  const [reason, setReason] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const searchResults = useMemo(() => {
+    if (!searchTerm.trim()) return [];
+    return products
+      .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      .filter(p => !selectedItems.find(item => item.productId === p.id))
+      .slice(0, 5);
+  }, [products, searchTerm, selectedItems]);
+
+  const addItem = (product: Product) => {
+    setSelectedItems([...selectedItems, { productId: product.id, quantity: 1 }]);
+    setSearchTerm('');
+  };
+
+  const removeItem = (id: string) => {
+    setSelectedItems(selectedItems.filter(i => i.productId !== id));
+  };
+
+  const updateQty = (id: string, qty: number) => {
+    const product = products.find(p => p.id === id);
+    if (!product) return;
+    const finalQty = Math.min(product.quantity, Math.max(1, qty));
+    setSelectedItems(selectedItems.map(i => i.productId === id ? { ...i, quantity: finalQty } : i));
+  };
+
+  const isValid = selectedItems.length > 0;
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in duration-200">
+        <div className="p-6 md:p-8 bg-orange-600 border-b border-orange-700 flex justify-between items-center text-white shrink-0">
+          <h3 className="text-xl md:text-2xl font-black flex items-center gap-3 uppercase tracking-tight">
+            <ArrowUpRight size={28} /> Múltiplas Saídas
+          </h3>
+          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-full transition-colors"><X size={28} /></button>
+        </div>
+        
+        <div className="p-6 md:p-8 space-y-8 overflow-y-auto flex-1">
+          {/* Busca de Produtos com Lista Flutuante */}
+          <div className="relative group">
+            <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">Buscar Produtos para Saída</label>
+            <div className="flex items-center bg-slate-100 border border-slate-200 rounded-3xl px-5 py-4 transition-all focus-within:ring-2 focus-within:ring-orange-500/20 focus-within:bg-white">
+              <Search className="text-slate-400 mr-3" size={22} />
+              <input 
+                type="text" 
+                placeholder="Nome do produto..." 
+                className="bg-transparent border-none focus:ring-0 w-full outline-none font-bold text-slate-700 placeholder:text-slate-400"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            
+            {/* Lista Flutuante (Dropdown) */}
+            {searchResults.length > 0 && (
+              <div className="absolute top-[calc(100%+8px)] left-0 right-0 bg-white border border-slate-200 rounded-3xl shadow-2xl z-50 overflow-hidden divide-y divide-slate-100 animate-in slide-in-from-top-2 duration-200">
+                <div className="bg-slate-50 px-5 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">Resultados da Busca</div>
+                {searchResults.map(p => (
+                  <button 
+                    key={p.id} 
+                    onClick={() => addItem(p)}
+                    className="w-full text-left p-5 hover:bg-orange-50 flex items-center justify-between group/item transition-colors"
+                  >
+                    <div>
+                      <div className="font-bold text-slate-800 group-hover/item:text-orange-700">{p.name}</div>
+                      <div className="text-xs text-slate-500 font-medium">Saldo em estoque: {p.quantity} un</div>
+                    </div>
+                    <div className="bg-orange-100 text-orange-600 p-2 rounded-xl opacity-0 group-hover/item:opacity-100 transition-opacity">
+                      <Plus size={18} />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Lista de Itens Selecionados (Conferência) */}
+          <div className="space-y-4">
+            <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+              <ShoppingCart size={14} /> Itens na Lista ({selectedItems.length})
+            </h4>
+            {selectedItems.length === 0 ? (
+              <div className="p-12 border-2 border-dashed border-slate-200 rounded-[2rem] text-center space-y-3 bg-slate-50/50">
+                <div className="bg-white w-12 h-12 rounded-full flex items-center justify-center mx-auto shadow-sm text-slate-300">
+                  <ListPlus size={24} />
+                </div>
+                <p className="text-slate-400 font-bold text-sm">Nenhum item adicionado à lista de saída.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {selectedItems.map(item => {
+                  const product = products.find(p => p.id === item.productId);
+                  return (
+                    <div key={item.productId} className="flex items-center gap-4 bg-white p-5 rounded-3xl border border-slate-100 shadow-sm animate-in slide-in-from-left-2 duration-200">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-slate-900 truncate">{product?.name}</div>
+                        <div className="text-[10px] text-slate-400 uppercase font-black tracking-wider">Disponível: {product?.quantity}</div>
+                      </div>
+                      <div className="flex items-center gap-3 bg-slate-100 rounded-2xl p-1.5 shrink-0">
+                        <button onClick={() => updateQty(item.productId, item.quantity - 1)} className="p-1.5 text-slate-500 hover:text-rose-500 hover:bg-white rounded-xl transition-all"><MinusCircle size={20} /></button>
+                        <input 
+                          type="number" 
+                          className="w-12 text-center font-black text-slate-900 outline-none border-none bg-transparent"
+                          value={item.quantity}
+                          onChange={(e) => updateQty(item.productId, parseInt(e.target.value) || 0)}
+                        />
+                        <button onClick={() => updateQty(item.productId, item.quantity + 1)} className="p-1.5 text-slate-500 hover:text-emerald-500 hover:bg-white rounded-xl transition-all"><Plus size={20} /></button>
+                      </div>
+                      <button onClick={() => removeItem(item.productId)} className="p-3 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"><Trash2 size={20} /></button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Observações (Opcional)</label>
+            <textarea 
+              className="w-full border-slate-200 rounded-3xl p-5 outline-none border min-h-[100px] text-sm resize-none font-bold text-slate-700 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500/10 transition-all" 
+              placeholder="Ex: Venda Lote #441, Remessa Filial, etc."
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="p-6 md:p-8 bg-slate-50 border-t border-slate-100 flex gap-4 shrink-0">
+          <button onClick={onClose} className="flex-1 py-5 bg-white border border-slate-200 rounded-3xl font-black text-slate-700 uppercase tracking-tight hover:bg-slate-100 transition-colors shadow-sm">Cancelar</button>
+          <button 
+            onClick={() => onSave(selectedItems, reason)} 
+            disabled={!isValid}
+            className="flex-1 py-5 bg-orange-600 rounded-3xl font-black text-white hover:bg-orange-700 shadow-xl uppercase tracking-tight disabled:opacity-50 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+          >
+            Finalizar Saídas
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const TransactionModal: React.FC<{ products: Product[]; type: TransactionType; onClose: () => void; onSave: (d: any) => void }> = ({ products, type, onClose, onSave }) => {
   const [formData, setFormData] = useState({ productId: products.length > 0 ? products[0].id : '', quantity: 1, reason: '', type });
